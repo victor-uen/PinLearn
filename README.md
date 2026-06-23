@@ -1,4 +1,4 @@
-# 漢語 — Mandarin Study App
+# PinLearn — Mandarin Study App
 
 App desktop para estudo de Mandarim com PyQt6 + SQLite.
 
@@ -20,11 +20,11 @@ mandarin_app/
 └── README.md
 ```
 
-## Como importar o vocabulário da Lição 14
+## Como importar o vocabulários
 
 1. Abra o app → aba **Vocabulário**
 2. Clique em **⬆ Importar CSV**
-3. Selecione o arquivo `licao14_exemplo.csv`
+3. Selecione o arquivo `vocabulario_exemplo.csv`
 4. Pronto! 36 palavras importadas.
 
 ## Formato do CSV para importação
