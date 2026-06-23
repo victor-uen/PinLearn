@@ -211,7 +211,7 @@ class SidebarBtn(QPushButton):
         self.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
-                color: {SB_TEXT};
+                color: {RED_SEAL};
                 border: none;
                 border-radius: 8px;
                 text-align: left;
@@ -269,7 +269,7 @@ class Sidebar(QWidget):
         lay.addStretch()
         lay.addWidget(self._sep())
         ver = QLabel("v1.0  •  SQLite")
-        ver.setStyleSheet(f"color: {MUTED}; font-size: 10px; background: transparent;")
+        ver.setStyleSheet(f"color: {RED_SEAL}; font-size: 10px; background: transparent;")
         ver.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(ver)
 
@@ -513,7 +513,8 @@ class VocabPage(QWidget):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(8, 46)
         self.table.setShowGrid(False)
         self.table.verticalHeader().setVisible(False)
         self.table.doubleClicked.connect(self._edit_selected)
