@@ -24,8 +24,8 @@ def init_db():
             example     TEXT,
             chapter     TEXT,
             notes       TEXT,
-            difficulty  INTEGER DEFAULT 1,  -- 1=fácil 2=médio 3=difícil
-            mastered    INTEGER DEFAULT 0,  -- 0=normal 1=dominada 2=precisa revisar
+            difficulty  INTEGER DEFAULT 1,
+            mastered    INTEGER DEFAULT 0,
             created_at  TEXT DEFAULT (datetime('now'))
         );
 
@@ -43,9 +43,9 @@ def init_db():
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             word_id     INTEGER REFERENCES words(id) ON DELETE SET NULL,
             session_id  TEXT,
-            quality     INTEGER,    -- 0-5 (SM-2 scale)
-            correct     INTEGER,    -- 1 ou 0
-            mode        TEXT,       -- char2trans | trans2char | pinyin2char
+            quality     INTEGER,
+            correct     INTEGER,
+            mode        TEXT,
             studied_at  TEXT DEFAULT (datetime('now'))
         );
 
@@ -54,7 +54,7 @@ def init_db():
             title       TEXT NOT NULL,
             body        TEXT,
             category    TEXT,
-            tags        TEXT,       -- JSON array string
+            tags        TEXT,
             chapter     TEXT,
             word_id     INTEGER REFERENCES words(id) ON DELETE SET NULL,
             created_at  TEXT DEFAULT (datetime('now')),
@@ -75,9 +75,7 @@ def add_word(character, pinyin, translation, gram_type="", example="",
             (character, pinyin, translation, gram_type, example, chapter, notes, difficulty)
         )
         word_id = cur.lastrowid
-        conn.execute(
-            "INSERT INTO srs_cards (word_id) VALUES (?)", (word_id,)
-        )
+        conn.execute("INSERT INTO srs_cards (word_id) VALUES (?)", (word_id,))
         return word_id
 
 
@@ -102,17 +100,13 @@ def get_words(chapter=None, gram_type=None, difficulty=None, mastered=None, sear
     query = "SELECT * FROM words WHERE 1=1"
     params = []
     if chapter:
-        query += " AND chapter=?"
-        params.append(chapter)
+        query += " AND chapter=?"; params.append(chapter)
     if gram_type:
-        query += " AND gram_type=?"
-        params.append(gram_type)
+        query += " AND gram_type=?"; params.append(gram_type)
     if difficulty:
-        query += " AND difficulty=?"
-        params.append(difficulty)
+        query += " AND difficulty=?"; params.append(difficulty)
     if mastered is not None:
-        query += " AND mastered=?"
-        params.append(mastered)
+        query += " AND mastered=?"; params.append(mastered)
     if search:
         query += " AND (character LIKE ? OR pinyin LIKE ? OR translation LIKE ?)"
         params += [f"%{search}%", f"%{search}%", f"%{search}%"]
@@ -125,6 +119,15 @@ def get_word(word_id):
     with get_conn() as conn:
         r = conn.execute("SELECT * FROM words WHERE id=?", (word_id,)).fetchone()
         return dict(r) if r else None
+
+
+def get_words_for_combo():
+    """Retorna lista simplificada para popular comboboxes."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, character, pinyin, translation FROM words ORDER BY character"
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_chapters():
@@ -144,29 +147,19 @@ def get_gram_types():
 
 
 def import_words_csv(rows):
-    """rows: list of dicts com as chaves do CSV"""
-    added = 0
-    skipped = 0
+    added = 0; skipped = 0
     with get_conn() as conn:
         for row in rows:
             char = row.get("character", "").strip()
             if not char:
-                skipped += 1
-                continue
+                skipped += 1; continue
             cur = conn.execute(
                 """INSERT INTO words (character,pinyin,translation,gram_type,
-                   example,chapter,notes,difficulty)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                (
-                    char,
-                    row.get("pinyin", "").strip(),
-                    row.get("translation", "").strip(),
-                    row.get("gram_type", "").strip(),
-                    row.get("example", "").strip(),
-                    row.get("chapter", "").strip(),
-                    row.get("notes", "").strip(),
-                    int(row.get("difficulty", 1)),
-                )
+                   example,chapter,notes,difficulty) VALUES (?,?,?,?,?,?,?,?)""",
+                (char, row.get("pinyin","").strip(), row.get("translation","").strip(),
+                 row.get("gram_type","").strip(), row.get("example","").strip(),
+                 row.get("chapter","").strip(), row.get("notes","").strip(),
+                 int(row.get("difficulty",1)))
             )
             conn.execute("INSERT INTO srs_cards (word_id) VALUES (?)", (cur.lastrowid,))
             added += 1
@@ -180,57 +173,41 @@ def get_due_cards(chapter=None, limit=20):
     query = """
         SELECT w.*, s.id as card_id, s.due_date, s.interval_days,
                s.ease_factor, s.repetitions
-        FROM srs_cards s
-        JOIN words w ON w.id = s.word_id
+        FROM srs_cards s JOIN words w ON w.id = s.word_id
         WHERE s.due_date <= ? AND w.mastered != 1
     """
     params = [today]
     if chapter:
-        query += " AND w.chapter=?"
-        params.append(chapter)
+        query += " AND w.chapter=?"; params.append(chapter)
     query += " ORDER BY s.due_date ASC LIMIT ?"
     params.append(limit)
     with get_conn() as conn:
         return [dict(r) for r in conn.execute(query, params).fetchall()]
 
 
-def update_srs(word_id, quality: int, session_id: str, mode: str):
-    """SM-2 algorithm. quality: 0-5"""
+def update_srs(word_id, quality, session_id, mode):
     with get_conn() as conn:
         card = conn.execute(
             "SELECT * FROM srs_cards WHERE word_id=?", (word_id,)
         ).fetchone()
-        if not card:
-            return
-
-        ef = card["ease_factor"]
-        reps = card["repetitions"]
-        interval = card["interval_days"]
-
+        if not card: return
+        ef = card["ease_factor"]; reps = card["repetitions"]; interval = card["interval_days"]
         if quality < 3:
-            reps = 0
-            interval = 1
+            reps = 0; interval = 1
         else:
-            if reps == 0:
-                interval = 1
-            elif reps == 1:
-                interval = 6
-            else:
-                interval = round(interval * ef)
+            if reps == 0: interval = 1
+            elif reps == 1: interval = 6
+            else: interval = round(interval * ef)
             reps += 1
-
         ef = max(1.3, ef + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
-        due = (datetime.now().date().__class__.fromordinal(
-            date.today().toordinal() + interval
-        )).isoformat()
-
+        due = (date.fromordinal(date.today().toordinal() + interval)).isoformat()
         conn.execute(
-            """UPDATE srs_cards SET interval_days=?, ease_factor=?, repetitions=?,
-               due_date=?, last_quality=? WHERE word_id=?""",
+            """UPDATE srs_cards SET interval_days=?,ease_factor=?,repetitions=?,
+               due_date=?,last_quality=? WHERE word_id=?""",
             (interval, ef, reps, due, quality, word_id)
         )
         conn.execute(
-            """INSERT INTO study_log (word_id, session_id, quality, correct, mode)
+            """INSERT INTO study_log (word_id,session_id,quality,correct,mode)
                VALUES (?,?,?,?,?)""",
             (word_id, session_id, quality, 1 if quality >= 3 else 0, mode)
         )
@@ -269,14 +246,22 @@ def get_notes(search=None, category=None, chapter=None):
         query += " AND (title LIKE ? OR body LIKE ? OR tags LIKE ?)"
         params += [f"%{search}%", f"%{search}%", f"%{search}%"]
     if category:
-        query += " AND category=?"
-        params.append(category)
+        query += " AND category=?"; params.append(category)
     if chapter:
-        query += " AND chapter=?"
-        params.append(chapter)
+        query += " AND chapter=?"; params.append(chapter)
     query += " ORDER BY updated_at DESC"
     with get_conn() as conn:
         return [dict(r) for r in conn.execute(query, params).fetchall()]
+
+
+def get_notes_by_word(word_id):
+    """Retorna todas as anotações vinculadas a uma palavra."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM notes WHERE word_id=? ORDER BY updated_at DESC",
+            (word_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_note_categories():
@@ -292,10 +277,8 @@ def get_note_categories():
 def get_daily_stats(days=30):
     with get_conn() as conn:
         rows = conn.execute(
-            """SELECT DATE(studied_at) as day, COUNT(*) as total,
-               SUM(correct) as correct
-               FROM study_log
-               WHERE studied_at >= datetime('now', ?)
+            """SELECT DATE(studied_at) as day, COUNT(*) as total, SUM(correct) as correct
+               FROM study_log WHERE studied_at >= datetime('now', ?)
                GROUP BY day ORDER BY day""",
             (f"-{days} days",)
         ).fetchall()
@@ -305,46 +288,22 @@ def get_daily_stats(days=30):
 def get_chapter_stats():
     with get_conn() as conn:
         rows = conn.execute(
-            """SELECT w.chapter,
-               COUNT(*) as total,
-               SUM(w.mastered=1) as mastered,
-               SUM(w.mastered=2) as needs_review,
+            """SELECT w.chapter, COUNT(*) as total,
+               SUM(w.mastered=1) as mastered, SUM(w.mastered=2) as needs_review,
                AVG(CASE WHEN sl.correct IS NOT NULL THEN sl.correct ELSE NULL END) as avg_correct
-               FROM words w
-               LEFT JOIN study_log sl ON sl.word_id = w.id
-               WHERE w.chapter != ''
-               GROUP BY w.chapter ORDER BY w.chapter"""
+               FROM words w LEFT JOIN study_log sl ON sl.word_id = w.id
+               WHERE w.chapter != '' GROUP BY w.chapter ORDER BY w.chapter"""
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-def get_session_stats(session_id):
-    with get_conn() as conn:
-        row = conn.execute(
-            """SELECT COUNT(*) as total, SUM(correct) as correct,
-               MIN(studied_at) as started, MAX(studied_at) as ended
-               FROM study_log WHERE session_id=?""",
-            (session_id,)
-        ).fetchone()
-        return dict(row) if row else {}
-
-
 def get_overall_stats():
     with get_conn() as conn:
-        words = conn.execute("SELECT COUNT(*) as c FROM words").fetchone()["c"]
-        mastered = conn.execute(
-            "SELECT COUNT(*) as c FROM words WHERE mastered=1"
+        words        = conn.execute("SELECT COUNT(*) as c FROM words").fetchone()["c"]
+        mastered     = conn.execute("SELECT COUNT(*) as c FROM words WHERE mastered=1").fetchone()["c"]
+        due          = conn.execute("SELECT COUNT(*) as c FROM srs_cards WHERE due_date <= date('now')").fetchone()["c"]
+        studied_today= conn.execute(
+            "SELECT COUNT(DISTINCT word_id) as c FROM study_log WHERE DATE(studied_at) = date('now')"
         ).fetchone()["c"]
-        due = conn.execute(
-            "SELECT COUNT(*) as c FROM srs_cards WHERE due_date <= date('now')"
-        ).fetchone()["c"]
-        studied_today = conn.execute(
-            """SELECT COUNT(DISTINCT word_id) as c FROM study_log
-               WHERE DATE(studied_at) = date('now')"""
-        ).fetchone()["c"]
-        return {
-            "total_words": words,
-            "mastered": mastered,
-            "due_today": due,
-            "studied_today": studied_today,
-        }
+        return {"total_words": words, "mastered": mastered,
+                "due_today": due, "studied_today": studied_today}
