@@ -4,6 +4,7 @@ import csv
 import json
 import uuid
 import time
+import random
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
@@ -54,6 +55,9 @@ QLineEdit, QTextEdit, QComboBox, QSpinBox {{ background: {WHITE}; border: 1.5px 
 QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus {{ border-color: {RED_SEAL}; }}
 QComboBox::drop-down {{ border: none; width: 24px; }}
 QComboBox::down-arrow {{ width: 10px; height: 10px; }}
+QCheckBox {{ color: {INK}; spacing: 8px; background: transparent; }}
+QCheckBox::indicator {{ width: 16px; height: 16px; border: 1.5px solid {BORDER}; border-radius: 4px; background: {WHITE}; }}
+QCheckBox::indicator:checked {{ background: {RED_SEAL}; border-color: {RED_SEAL}; }}
 QTableWidget {{ background: {WHITE}; alternate-background-color: {CARD_BG}; border: 1.5px solid {BORDER}; border-radius: 8px; gridline-color: {BORDER}; }}
 QTableWidget::item {{ padding: 6px 8px; }}
 QTableWidget::item:selected {{ background: {RED_SEAL}; color: {WHITE}; }}
@@ -623,9 +627,16 @@ class StudyPage(QWidget):
         hdr.addWidget(title); hdr.addStretch()
         self.mode_combo=QComboBox(); self.mode_combo.addItems(["Caractere → Tradução","Tradução → Caractere","Pinyin → Caractere"])
         self.chap_combo=QComboBox(); self.chap_combo.addItem("Todos os capítulos")
+        self.gram_combo=QComboBox(); self.gram_combo.addItem("Todos os tipos")
+        self.diff_combo=QComboBox(); self.diff_combo.addItems(["Dificuldade","1 – Fácil","2 – Médio","3 – Difícil"])
         self.limit_spin=QSpinBox(); self.limit_spin.setRange(5,100); self.limit_spin.setValue(20); self.limit_spin.setPrefix("Limite: ")
+        self.chk_hide_pinyin=QCheckBox("Ocultar pinyin até revelar")
+        self.chk_shuffle=QCheckBox("Embaralhar")
         hdr.addWidget(QLabel("Modo:")); hdr.addWidget(self.mode_combo)
-        hdr.addWidget(QLabel("Capítulo:")); hdr.addWidget(self.chap_combo); hdr.addWidget(self.limit_spin)
+        hdr.addWidget(QLabel("Capítulo:")); hdr.addWidget(self.chap_combo)
+        hdr.addWidget(QLabel("Tipo gramatical:")); hdr.addWidget(self.gram_combo)
+        hdr.addWidget(self.diff_combo); hdr.addWidget(self.limit_spin)
+        hdr.addWidget(self.chk_hide_pinyin); hdr.addWidget(self.chk_shuffle)
         btn_start=QPushButton("▶  Iniciar sessão"); btn_start.clicked.connect(self._start_session); hdr.addWidget(btn_start); lay.addLayout(hdr)
         self.prog_bar=QProgressBar()
         self.prog_bar.setStyleSheet(f"QProgressBar {{background:{BORDER};border-radius:4px;height:8px;text-align:center;color:transparent;}} QProgressBar::chunk {{background:{RED_SEAL};border-radius:4px;}}")
@@ -636,13 +647,14 @@ class StudyPage(QWidget):
         idle_msg=QLabel("Configure o deck acima e clique em Iniciar sessão"); idle_msg.setStyleSheet(f"color:{MUTED}; font-size:15px;"); idle_msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
         idle_lay.addWidget(idle_icon); idle_lay.addWidget(idle_msg); self.stack.addWidget(idle)
         fc=QWidget(); fc_lay=QVBoxLayout(fc); fc_lay.setAlignment(Qt.AlignmentFlag.AlignCenter); fc_lay.setSpacing(20)
-        self.card_frame_widget=card_frame(); self.card_frame_widget.setFixedSize(560,280)
+        self.card_frame_widget=card_frame(); self.card_frame_widget.setMinimumSize(900, 480)
+        self.card_frame_widget.setMaximumSize(16777215, 16777215)
         cf_lay=QVBoxLayout(self.card_frame_widget); cf_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_prompt_type=QLabel(""); self.lbl_prompt_type.setStyleSheet(f"color:{MUTED}; font-size:11px; letter-spacing:2px;"); self.lbl_prompt_type.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_prompt=QLabel(""); self.lbl_prompt.setFont(QFont("Segoe UI",36,QFont.Weight.Bold)); self.lbl_prompt.setAlignment(Qt.AlignmentFlag.AlignCenter); self.lbl_prompt.setWordWrap(True)
-        self.lbl_hint=QLabel(""); self.lbl_hint.setStyleSheet(f"color:{MUTED}; font-size:13px;"); self.lbl_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_answer=QLabel(""); self.lbl_answer.setFont(QFont("Segoe UI",18)); self.lbl_answer.setAlignment(Qt.AlignmentFlag.AlignCenter); self.lbl_answer.setWordWrap(True)
-        self.lbl_example=QLabel(""); self.lbl_example.setStyleSheet(f"color:{MUTED}; font-size:12px; font-style:italic;"); self.lbl_example.setAlignment(Qt.AlignmentFlag.AlignCenter); self.lbl_example.setWordWrap(True)
+        self.lbl_prompt_type=QLabel(""); self.lbl_prompt_type.setStyleSheet(f"color:{MUTED}; font-size:16px; letter-spacing:2px;"); self.lbl_prompt_type.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_prompt=QLabel(""); self.lbl_prompt.setFont(QFont("Segoe UI",96,QFont.Weight.Bold)); self.lbl_prompt.setAlignment(Qt.AlignmentFlag.AlignCenter); self.lbl_prompt.setWordWrap(True)
+        self.lbl_hint=QLabel(""); self.lbl_hint.setStyleSheet(f"color:{MUTED}; font-size:28px;"); self.lbl_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_answer=QLabel(""); self.lbl_answer.setFont(QFont("Segoe UI",44)); self.lbl_answer.setAlignment(Qt.AlignmentFlag.AlignCenter); self.lbl_answer.setWordWrap(True)
+        self.lbl_example=QLabel(""); self.lbl_example.setStyleSheet(f"color:{MUTED}; font-size:19px; font-style:italic;"); self.lbl_example.setAlignment(Qt.AlignmentFlag.AlignCenter); self.lbl_example.setWordWrap(True)
         for w in [self.lbl_prompt_type,self.lbl_prompt,self.lbl_hint,h_sep(),self.lbl_answer,self.lbl_example]: cf_lay.addWidget(w)
         fc_lay.addWidget(self.card_frame_widget,alignment=Qt.AlignmentFlag.AlignCenter)
         self.btn_reveal=QPushButton("👁  Revelar resposta"); self.btn_reveal.setFixedWidth(220); self.btn_reveal.clicked.connect(self._reveal)
@@ -665,10 +677,19 @@ class StudyPage(QWidget):
         idx=self.chap_combo.findText(cur)
         if idx>=0: self.chap_combo.setCurrentIndex(idx)
         self.chap_combo.blockSignals(False)
+        cur_g=self.gram_combo.currentText(); self.gram_combo.blockSignals(True)
+        self.gram_combo.clear(); self.gram_combo.addItem("Todos os tipos")
+        for g in db.get_gram_types(): self.gram_combo.addItem(g)
+        idx=self.gram_combo.findText(cur_g)
+        if idx>=0: self.gram_combo.setCurrentIndex(idx)
+        self.gram_combo.blockSignals(False)
 
     def _start_session(self):
         chap=self.chap_combo.currentText() if self.chap_combo.currentIndex()>0 else None
-        self.cards=db.get_due_cards(chapter=chap,limit=self.limit_spin.value())
+        gram=self.gram_combo.currentText() if self.gram_combo.currentIndex()>0 else None
+        diff_i=self.diff_combo.currentIndex(); diff=diff_i if diff_i>0 else None
+        self.cards=db.get_due_cards(chapter=chap,limit=self.limit_spin.value(),gram_type=gram,difficulty=diff)
+        if self.chk_shuffle.isChecked(): random.shuffle(self.cards)
         if not self.cards: QMessageBox.information(self,"Sem cards","Nenhum card para revisar agora. Parabéns!"); return
         self.current_idx=0; self.session_id=str(uuid.uuid4()); self.session_correct=self.session_total=0
         self.start_time=time.time(); self.mode={0:"char2trans",1:"trans2char",2:"pinyin2char"}[self.mode_combo.currentIndex()]
@@ -678,15 +699,19 @@ class StudyPage(QWidget):
         self.revealed=False; self.lbl_answer.hide(); self.lbl_example.hide(); self.btn_reveal.show(); self.quality_frame.hide()
         card=self.cards[self.current_idx]; self.prog_bar.setValue(self.current_idx)
         if self.mode=="char2trans":
-            self.lbl_prompt_type.setText("CARACTERE → TRADUÇÃO"); self.lbl_prompt.setText(card["character"]); self.lbl_hint.setText(card["pinyin"]); self.lbl_answer.setText(card["translation"])
+            self.lbl_prompt_type.setText("CARACTERE → TRADUÇÃO"); self.lbl_prompt.setText(card["character"])
+            self.lbl_hint.setText("" if self.chk_hide_pinyin.isChecked() else card["pinyin"]); self.lbl_answer.setText(card["translation"])
         elif self.mode=="trans2char":
-            self.lbl_prompt_type.setText("TRADUÇÃO → CARACTERE"); self.lbl_prompt.setFont(QFont("Segoe UI",22,QFont.Weight.Bold)); self.lbl_prompt.setText(card["translation"]); self.lbl_hint.setText(""); self.lbl_answer.setText(f"{card['character']}  ({card['pinyin']})")
+            self.lbl_prompt_type.setText("TRADUÇÃO → CARACTERE"); self.lbl_prompt.setFont(QFont("Segoe UI",60,QFont.Weight.Bold)); self.lbl_prompt.setText(card["translation"]); self.lbl_hint.setText(""); self.lbl_answer.setText(f"{card['character']}  ({card['pinyin']})")
         else:
-            self.lbl_prompt_type.setText("PINYIN → CARACTERE"); self.lbl_prompt.setFont(QFont("Segoe UI",28,QFont.Weight.Bold)); self.lbl_prompt.setText(card["pinyin"]); self.lbl_hint.setText(card["translation"]); self.lbl_answer.setText(card["character"])
+            self.lbl_prompt_type.setText("PINYIN → CARACTERE"); self.lbl_prompt.setFont(QFont("Segoe UI",72,QFont.Weight.Bold)); self.lbl_prompt.setText(card["pinyin"]); self.lbl_hint.setText(card["translation"]); self.lbl_answer.setText(card["character"])
         self.lbl_example.setText(f'"{card["example"]}"' if card.get("example") else "")
 
     def _reveal(self):
-        self.revealed=True; self.lbl_answer.show(); self.lbl_example.show(); self.btn_reveal.hide(); self.quality_frame.show()
+        self.revealed=True
+        if self.mode=="char2trans" and self.chk_hide_pinyin.isChecked():
+            self.lbl_hint.setText(self.cards[self.current_idx]["pinyin"])
+        self.lbl_answer.show(); self.lbl_example.show(); self.btn_reveal.hide(); self.quality_frame.show()
 
     def _rate(self,quality):
         card=self.cards[self.current_idx]; db.update_srs(card.get("word_id",card["id"]),quality,self.session_id,self.mode)

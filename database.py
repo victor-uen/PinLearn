@@ -168,7 +168,7 @@ def import_words_csv(rows):
 
 # ─── SRS ──────────────────────────────────────────────────────────────────────
 
-def get_due_cards(chapter=None, limit=20):
+def get_due_cards(chapter=None, limit=20, gram_type=None, difficulty=None):
     today = date.today().isoformat()
     query = """
         SELECT w.*, s.id as card_id, s.due_date, s.interval_days,
@@ -179,6 +179,10 @@ def get_due_cards(chapter=None, limit=20):
     params = [today]
     if chapter:
         query += " AND w.chapter=?"; params.append(chapter)
+    if gram_type:
+        query += " AND w.gram_type=?"; params.append(gram_type)
+    if difficulty:
+        query += " AND w.difficulty=?"; params.append(difficulty)
     query += " ORDER BY s.due_date ASC LIMIT ?"
     params.append(limit)
     with get_conn() as conn:
