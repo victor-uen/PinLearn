@@ -168,15 +168,24 @@ def import_words_csv(rows):
 
 # ─── SRS ──────────────────────────────────────────────────────────────────────
 
-def get_due_cards(chapter=None, limit=20, gram_type=None, difficulty=None):
+def get_due_cards(chapter=None, limit=20, gram_type=None, difficulty=None, force=False):
     today = date.today().isoformat()
-    query = """
-        SELECT w.*, s.id as card_id, s.due_date, s.interval_days,
-               s.ease_factor, s.repetitions
-        FROM srs_cards s JOIN words w ON w.id = s.word_id
-        WHERE s.due_date <= ? AND w.mastered != 1
-    """
-    params = [today]
+    if force:
+        query = """
+            SELECT w.*, s.id as card_id, s.due_date, s.interval_days,
+                   s.ease_factor, s.repetitions
+            FROM srs_cards s JOIN words w ON w.id = s.word_id
+            WHERE w.mastered != 1
+        """
+        params = []
+    else:
+        query = """
+            SELECT w.*, s.id as card_id, s.due_date, s.interval_days,
+                   s.ease_factor, s.repetitions
+            FROM srs_cards s JOIN words w ON w.id = s.word_id
+            WHERE s.due_date <= ? AND w.mastered != 1
+        """
+        params = [today]
     if chapter:
         query += " AND w.chapter=?"; params.append(chapter)
     if gram_type:

@@ -64,6 +64,9 @@ QTableWidget::item:selected {{ background: {RED_SEAL}; color: {WHITE}; }}
 QHeaderView::section {{ background: {INK}; color: {PAPER}; padding: 8px; border: none; font-weight: 600; }}
 QScrollBar:vertical {{ background: {CARD_BG}; width: 8px; border-radius: 4px; }}
 QScrollBar::handle:vertical {{ background: {MUTED}; border-radius: 4px; min-height: 30px; }}
+QScrollBar:horizontal {{ background: {CARD_BG}; height: 8px; border-radius: 4px; }}
+QScrollBar::handle:horizontal {{ background: {MUTED}; border-radius: 4px; min-width: 30px; }}
+QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
 QTabWidget::pane {{ border: 1.5px solid {BORDER}; border-radius: 8px; background: {WHITE}; }}
 QTabBar::tab {{ background: {CARD_BG}; color: {MUTED}; padding: 8px 20px; border: 1.5px solid {BORDER}; border-bottom: none; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; }}
 QTabBar::tab:selected {{ background: {WHITE}; color: {INK}; font-weight: 600; border-color: {RED_SEAL}; }}
@@ -303,15 +306,27 @@ class VocabPage(QWidget):
             if hasattr(w,"textChanged"): w.textChanged.connect(self._refresh)
             else: w.currentIndexChanged.connect(self._refresh)
         lay.addLayout(filt)
-        cols=["#","Caractere","Pinyin","Tradução","Tipo","Capítulo","Dificuldade","Status",""]
+        cols=["#","Caractere","Pinyin","Tradução","Tipo","Exemplo","Capítulo","Dificuldade","Status",""]
         self.table=QTableWidget(0,len(cols)); self.table.setHorizontalHeaderLabels(cols)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(8,QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(8,46); self.table.setShowGrid(False)
+        hdr = self.table.horizontalHeader()
+        hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(9, QHeaderView.ResizeMode.Fixed)
+        hdr.setMinimumSectionSize(46)
+        self.table.setColumnWidth(1, 90)
+        self.table.setColumnWidth(2, 130)
+        self.table.setColumnWidth(4, 70)
+        self.table.setColumnWidth(6, 80)
+        self.table.setColumnWidth(7, 90)
+        self.table.setColumnWidth(8, 100)
+        self.table.setColumnWidth(9, 46)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.table.setShowGrid(False)
         self.table.verticalHeader().setVisible(False)
         self.table.doubleClicked.connect(self._edit_selected)
         lay.addWidget(self.table); self._word_ids=[]
@@ -342,7 +357,7 @@ class VocabPage(QWidget):
         status_map={0:"Normal",1:"✓ Dominada",2:"⚠ Revisar"}; diff_map={1:"Fácil",2:"Médio",3:"Difícil"}
         for row_i,w in enumerate(words):
             self.table.insertRow(row_i)
-            cells=[str(row_i+1),w["character"],w["pinyin"],w["translation"],w.get("gram_type",""),w.get("chapter",""),diff_map.get(w.get("difficulty",1),""),status_map.get(w.get("mastered",0),"")]
+            cells=[str(row_i+1),w["character"],w["pinyin"],w["translation"],w.get("gram_type",""),w.get("example",""),w.get("chapter",""),diff_map.get(w.get("difficulty",1),""),status_map.get(w.get("mastered",0),"")]
             for col,val in enumerate(cells):
                 item=QTableWidgetItem(val); item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter|Qt.AlignmentFlag.AlignLeft)
                 if col==1: item.setFont(QFont("Segoe UI",15))
@@ -352,7 +367,7 @@ class VocabPage(QWidget):
             edit_btn=QPushButton("✏"); edit_btn.setFixedSize(36,30)
             edit_btn.setStyleSheet(f"background:{GOLD}; color:white; border-radius:4px; font-size:13px;")
             edit_btn.clicked.connect(lambda _,wid=w["id"]: self._edit_word(wid))
-            self.table.setCellWidget(row_i,8,edit_btn)
+            self.table.setCellWidget(row_i,9,edit_btn)
 
     def _add_word(self):
         dlg=WordDialog(self)
@@ -632,11 +647,12 @@ class StudyPage(QWidget):
         self.limit_spin=QSpinBox(); self.limit_spin.setRange(5,100); self.limit_spin.setValue(20); self.limit_spin.setPrefix("Limite: ")
         self.chk_hide_pinyin=QCheckBox("Ocultar pinyin até revelar")
         self.chk_shuffle=QCheckBox("Embaralhar")
+        self.chk_force=QCheckBox("Estudar tudo")
         hdr.addWidget(QLabel("Modo:")); hdr.addWidget(self.mode_combo)
         hdr.addWidget(QLabel("Capítulo:")); hdr.addWidget(self.chap_combo)
         hdr.addWidget(QLabel("Tipo gramatical:")); hdr.addWidget(self.gram_combo)
         hdr.addWidget(self.diff_combo); hdr.addWidget(self.limit_spin)
-        hdr.addWidget(self.chk_hide_pinyin); hdr.addWidget(self.chk_shuffle)
+        hdr.addWidget(self.chk_hide_pinyin); hdr.addWidget(self.chk_shuffle); hdr.addWidget(self.chk_force)
         btn_start=QPushButton("▶  Iniciar sessão"); btn_start.clicked.connect(self._start_session); hdr.addWidget(btn_start); lay.addLayout(hdr)
         self.prog_bar=QProgressBar()
         self.prog_bar.setStyleSheet(f"QProgressBar {{background:{BORDER};border-radius:4px;height:8px;text-align:center;color:transparent;}} QProgressBar::chunk {{background:{RED_SEAL};border-radius:4px;}}")
@@ -688,7 +704,7 @@ class StudyPage(QWidget):
         chap=self.chap_combo.currentText() if self.chap_combo.currentIndex()>0 else None
         gram=self.gram_combo.currentText() if self.gram_combo.currentIndex()>0 else None
         diff_i=self.diff_combo.currentIndex(); diff=diff_i if diff_i>0 else None
-        self.cards=db.get_due_cards(chapter=chap,limit=self.limit_spin.value(),gram_type=gram,difficulty=diff)
+        self.cards=db.get_due_cards(chapter=chap,limit=self.limit_spin.value(),gram_type=gram,difficulty=diff,force=self.chk_force.isChecked())
         if self.chk_shuffle.isChecked(): random.shuffle(self.cards)
         if not self.cards: QMessageBox.information(self,"Sem cards","Nenhum card para revisar agora. Parabéns!"); return
         self.current_idx=0; self.session_id=str(uuid.uuid4()); self.session_correct=self.session_total=0
